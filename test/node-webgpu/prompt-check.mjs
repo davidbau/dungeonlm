@@ -69,12 +69,14 @@ const cases = [
 
 let failed = 0;
 for (const { input, want } of cases) {
-  // Note: we used to need `await engine.resetChat()` between cases to
-  // avoid an xgrammar state-corruption crash after ~14 completions.
-  // patch.mjs now disables Web-LLM's grammar-matcher reuse at the source,
-  // so the matcher is re-created per call and this workaround isn't
-  // needed. (And calling resetChat() every iteration forces re-prefill
-  // of the system prompt — 2.5x slowdown — which we don't want.)
+  // resetChat() clears any lingering Web-LLM/xgrammar state between
+  // cases. patch.mjs disables matcher reuse, but there appears to be
+  // another state leak (observed crashes at ~case 13 even with the
+  // patch). resetChat adds ~2s KV-reprefill per call and makes the
+  // suite fully stable.
+  if (typeof engine.resetChat === 'function') {
+    await engine.resetChat();
+  }
   const r = await engine.chat.completions.create({
     messages: [
       { role: 'system', content: SYSTEM },
