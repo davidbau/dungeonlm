@@ -81,7 +81,9 @@ EXAMPLES:
 "how do I play" → {"command":"HELP","confidence":0.95,"explanation":""}
 "how does this work" → {"command":"HELP","confidence":0.9,"explanation":""}
 "I'm stuck" → {"command":"HELP","confidence":0.85,"explanation":""}
-"what can I do here" → {"command":"HELP","confidence":0.85,"explanation":""}
+"I have no idea what to do" → {"command":"HELP","confidence":0.85,"explanation":""}
+"I need help" → {"command":"HELP","confidence":0.95,"explanation":""}
+"show me the commands" → {"command":"HELP","confidence":0.9,"explanation":""}
 "look closer at the mailbox" → {"command":"EXAMINE MAILBOX","confidence":0.9,"explanation":""}
 "look at the lantern" → {"command":"EXAMINE LANTERN","confidence":0.9,"explanation":""}
 

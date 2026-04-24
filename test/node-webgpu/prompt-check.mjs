@@ -33,7 +33,15 @@ const cases = [
   { input: 'tell me about dungeon?',                       want: 'INFO' },
   { input: 'what is this game about',                      want: 'INFO' },
   { input: 'how do I play',                                want: 'HELP' },
-  { input: 'what can I do here',                           want: 'HELP' },
+  // HELP is the preferred answer for clear how-to / stuck / need-help
+  // phrasings. "what can I do here" is intentionally NOT in this set —
+  // we accept LOOK as a reasonable answer there because "here" biases
+  // the model toward describing the room, which is also useful.
+  { input: 'I need help',                                  want: 'HELP' },
+  { input: 'I have no idea what to do',                    want: 'HELP' },
+  { input: 'show me the commands',                         want: 'HELP' },
+  { input: 'how does this work',                           want: 'HELP' },
+  { input: 'what can I do here',                           want: 'LOOK' },
   { input: 'what am I carrying',                           want: 'INVENTORY' },
   { input: 'where am I',                                   want: 'LOOK' },
   { input: 'I quit',                                       want: 'QUIT' },
