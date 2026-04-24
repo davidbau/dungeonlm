@@ -7,10 +7,17 @@
     "serve": "python3 -m http.server 8080",
     "grammar:extract": "node js/llm/extract-vocabulary.mjs",
     "grammar:generate": "node js/llm/generate-grammar.mjs",
-    "grammar:all": "npm run grammar:extract && npm run grammar:generate"
+    "grammar:all": "npm run grammar:extract && npm run grammar:generate",
+    "postinstall": "node test/node-webgpu/patch.mjs || true",
+    "test:node-webgpu": "node test/node-webgpu/smoke.mjs",
+    "test:node-webgpu:patch": "node test/node-webgpu/patch.mjs"
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.82"
+  },
+  "devDependencies": {
+    "webgpu": "^0.4.0",
+    "fake-indexeddb": "^6.0.0"
   },
   "keywords": [
     "dungeon",

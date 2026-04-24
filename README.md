@@ -67,6 +67,23 @@ translation fails, the original input is passed through. The classic
 parser remains byte-for-byte compatible with the Fortran original (the
 port is separately parity-tested against the 1980 source).
 
+## Fast dev loop for the LLM parser
+
+For iterating on grammar, prompts, or vocabulary without a browser round-trip,
+dungeonlm has a **Node + Dawn WebGPU** test harness that runs the same
+Web-LLM engine against your actual GPU from a plain `node` process:
+
+```bash
+npm install                   # postinstall patches the Web-LLM bundle
+npm run test:node-webgpu      # ~2.8s after first model download (~350 MB cached locally)
+```
+
+See [`test/node-webgpu/README.md`](./test/node-webgpu/README.md) for the
+full story — it's the first publicly documented path for running
+`@mlc-ai/web-llm` unmodified in Node, and exercises the exact same
+grammar-constrained decoding (`response_format: { type: "grammar" }`)
+that the browser uses.
+
 ## Regenerating the grammar
 
 After any change to `game/parser.js` word tables:

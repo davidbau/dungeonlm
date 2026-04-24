@@ -4,6 +4,9 @@ node_modules/
 js/llm/models/
 js/llm/libs/*.wasm
 
+# Node + Dawn WebGPU test cache (model weights live here; large)
+.webllm-cache/
+
 # Editor / OS junk
 .DS_Store
 *.swp
