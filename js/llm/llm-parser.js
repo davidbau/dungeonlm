@@ -101,6 +101,32 @@ vocabulary.
 
 ## Rules (in priority order)
 
+0. IDENTIFY INTENT FIRST. Before picking a verb, read the whole input
+   and decide what the player wants to do. Only then choose the closest
+   vocabulary verb. Never latch onto a word in the input just because
+   it happens to also be a grammar-valid verb.
+
+   In particular: many English words are BOTH game verbs AND common
+   nouns. When the player uses one as a NOUN (describing an object) you
+   must NOT emit it as the verb.
+
+   - "take the boards off the door" — BOARDS is a noun (planks), not
+     the BOARD verb. Intent is "remove obstructions" → OPEN DOOR (or
+     BREAK DOOR if OPEN fails).
+   - "pour water on the fire" — WATER is a noun, not the verb (there
+     is no WATER verb anyway, but be careful with LIGHT/DRINK/RING).
+   - "turn on the light" — LIGHT is the object here; the verb is
+     "turn on" → LIGHT LAMP (or LIGHT CANDLE — map "light" as object
+     to the nearest light-source noun in the scene).
+   - "tie the rope to the post" — ROPE is the object; the verb is
+     TIE → TIE ROPE TO POST.
+   - "ring the bell" — here RING *is* the verb (player rings a bell);
+     fine. But "pick up the ring" — RING is the noun; verb is TAKE.
+
+   Heuristic: if the word you're about to use as a verb appears in the
+   input preceded by "the", "a", "my", "our", "some", or as the object
+   of a preposition, it's probably a noun — pick a different verb.
+
 1. PRESERVE THE OBJECT. If the input names a specific object, emit a
    command that names it. NEVER invent extra nouns. If the input says
    "mailbox," the output must mention MAILBOX and nothing else.
@@ -211,6 +237,21 @@ synonyms correctly, and lets us refuse to invent objects):
   Scene: "You are in a dark room. You can't see anything."
   "light the lantern"
     -> {"command": "LIGHT LANTERN", "confidence": 0.95, "explanation": "standard dark-room move"}
+
+Verb-vs-noun disambiguation (input word is a grammar verb but used as a
+noun/object in the sentence — do NOT emit it as the verb):
+
+  Scene: "This is an open field west of a white house with a boarded front door."
+  "can we take the boards off the door"
+    -> {"command": "OPEN DOOR", "confidence": 0.7, "explanation": "'boards' is a noun here (the planks), not the BOARD verb; intent is remove obstruction -> OPEN DOOR"}
+
+  Scene: "A brass lantern is here."
+  "turn on the light"
+    -> {"command": "LIGHT LANTERN", "confidence": 0.85, "explanation": "'light' is object here; verb is 'turn on' -> LIGHT the lantern"}
+
+  Scene: "You are at the entrance. A fire is burning."
+  "pour water on the fire"
+    -> {"command": "POUR WATER ON FIRE", "confidence": 0.9, "explanation": "'water' is object, not a verb"}
 
 Reply ONLY with the JSON object. No prose.`;
 

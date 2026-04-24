@@ -13,24 +13,37 @@
 //   term.clear()
 
 export class Terminal {
-    constructor(container, { promptColor = '#ffc', textColor = '#5e5', bgColor = '#0a0e0a' } = {}) {
+    constructor(container, {
+        promptColor = '#ffc',
+        textColor = '#5e5',
+        bgColor = '#0a0e0a',
+        rows = 24,
+        fontSize = 14,
+        lineHeight = 1.4,
+    } = {}) {
         this.container = container;
         this.promptColor = promptColor;
         this.textColor = textColor;
         this.bgColor = bgColor;
+        this.rows = rows;
 
+        // Fixed 24-line window like the original 1981 CRT. Content
+        // beyond `rows` scrolls within this box; --More-- pagination
+        // keeps the player from missing anything.
+        const paddingPx = 16;
+        const heightPx = Math.round(rows * fontSize * lineHeight) + 2 * paddingPx;
         container.style.cssText = `
             background: ${bgColor};
             color: ${textColor};
             font-family: "DejaVu Sans Mono", "Bitstream Vera Sans Mono", "Liberation Mono", monospace;
-            font-size: 14px;
-            line-height: 1.4;
-            padding: 16px;
+            font-size: ${fontSize}px;
+            line-height: ${lineHeight};
+            padding: ${paddingPx}px;
             overflow-y: auto;
             white-space: pre-wrap;
             word-break: break-word;
-            min-height: 400px;
-            max-height: calc(100vh - 160px);
+            height: ${heightPx}px;
+            max-height: ${heightPx}px;
             cursor: text;
         `;
         container.tabIndex = 0;
@@ -92,12 +105,9 @@ export class Terminal {
     }
 
     _pageSize() {
-        // Rough estimate: viewport rows minus 2 for the input line and
+        // Fixed-size terminal: reserve 2 rows for the input line and
         // the --More-- prompt itself.
-        const viewportH = this.container.clientHeight || window.innerHeight || 600;
-        const fs = parseFloat(getComputedStyle(this.container).fontSize) || 14;
-        const lineH = fs * 1.4;
-        return Math.max(6, Math.floor(viewportH / lineH) - 2);
+        return Math.max(6, this.rows - 2);
     }
 
     async _moreprompt() {
