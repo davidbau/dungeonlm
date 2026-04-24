@@ -121,11 +121,28 @@ async function ensureLlmLoaded() {
 // stays fast and deterministic.
 
 const buffered = [];
+// The most recent successfully-printed scene text. The game already
+// describes "You are at X. There is a mailbox here. ..." on every room
+// transition and on LOOK — so capturing the last flushed output gives
+// the LLM free, always-accurate room context and object list without
+// introspecting game state. Capped to ~1200 chars so the prompt stays
+// short; older lines fall off the top on overflow.
+let lastScene = '';
+const MAX_SCENE_CHARS = 1200;
+
+function updateLastScene(lines) {
+    // Drop the bare ">" prompt the parser emits as a marker.
+    const keep = lines.filter(l => l !== '>');
+    if (keep.length === 0) return;
+    const joined = keep.join('\n');
+    lastScene = (lastScene + '\n' + joined).slice(-MAX_SCENE_CHARS);
+}
 
 async function flushBuffer() {
     // Drop the bare ">" prompt rdline emitted; we draw our own.
     while (buffered.length && buffered[buffered.length - 1] === '>') buffered.pop();
     if (buffered.length) {
+        updateLastScene(buffered);
         await terminal.printPaged(buffered);
         buffered.length = 0;
     }
@@ -138,7 +155,7 @@ async function translateOnParseFail(original) {
     await flushBuffer();
     try {
         terminal.printColored('(translating…)\n', '#888');
-        const result = await llm.translate(original);
+        const result = await llm.translate(original, { context: lastScene });
         if (result && result.command) {
             terminal.printColored(
                 `  ⤷ ${result.command}` +
