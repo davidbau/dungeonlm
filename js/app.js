@@ -43,8 +43,12 @@ function setProgress(text) {
     if (progressEl) progressEl.textContent = text || '';
 }
 
-toggle.checked = localStorage.getItem(LLM_TOGGLE_KEY) === '1';
-state.llmEnabled = toggle.checked;
+// Default ON — dungeonlm is specifically the LLM-enhanced build. Users
+// who don't want the ~1 GB model download can opt out via the checkbox,
+// and that choice persists in localStorage.
+const disabled = localStorage.getItem(LLM_TOGGLE_KEY) === '0';
+toggle.checked = !disabled;
+state.llmEnabled = !disabled;
 
 toggle.addEventListener('change', async () => {
     state.llmEnabled = toggle.checked;
@@ -56,22 +60,54 @@ toggle.addEventListener('change', async () => {
     }
 });
 
+function formatEta(seconds) {
+    if (!isFinite(seconds) || seconds < 1) return '';
+    if (seconds < 60) return `~${Math.round(seconds)}s remaining`;
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return `~${m}m ${s}s remaining`;
+}
+
+function renderProgress(p, startMs) {
+    const pct = (p.progress || 0) * 100;
+    const elapsedSec = (performance.now() - startMs) / 1000;
+    let eta = '';
+    if (p.progress > 0.01) {
+        const totalSec = elapsedSec / p.progress;
+        eta = formatEta(totalSec - elapsedSec);
+    }
+    // Web-LLM's p.text already includes MB/percent/elapsed; append our ETA.
+    const base = p.text || `${pct.toFixed(0)}%`;
+    return eta ? `${base}  (${eta})` : base;
+}
+
 async function ensureLlmLoaded() {
     if (state.llmLoaded || state.loading) return;
     state.loading = true;
-    setStatus('LLM parser: loading model (one-time ~850 MB download)…');
-    try {
-        await llm.prepare((p) => {
-            setProgress(p.text || `${Math.round((p.progress || 0) * 100)}%`);
-        });
-        state.llmLoaded = true;
-        setStatus('LLM parser: ready');
-        setProgress('');
-    } catch (e) {
-        setStatus(`LLM parser: load failed — ${e.message}`);
-        state.loading = false;
-        toggle.checked = false;
-        state.llmEnabled = false;
+    // Auto-retry on transient Cache.add() failures — HuggingFace occasionally
+    // returns a redirect or timeout on the first request from a fresh origin.
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        const prefix = attempt > 1 ? `(retry ${attempt}/${MAX_ATTEMPTS}) ` : '';
+        setStatus(`${prefix}LLM parser: loading model (one-time ~1 GB download)…`);
+        const startMs = performance.now();
+        try {
+            await llm.prepare((p) => setProgress(renderProgress(p, startMs)));
+            state.llmLoaded = true;
+            setStatus('LLM parser: ready');
+            setProgress('');
+            state.loading = false;
+            return;
+        } catch (e) {
+            if (attempt < MAX_ATTEMPTS) {
+                setStatus(`LLM parser: transient error, retrying… (${e.message})`);
+                await new Promise(r => setTimeout(r, 2000 * attempt));
+                continue;
+            }
+            setStatus(`LLM parser: load failed — ${e.message}`);
+            toggle.checked = false;
+            state.llmEnabled = false;
+        }
     }
     state.loading = false;
 }
