@@ -58,7 +58,13 @@ const cases = [
 
   // Verb-vs-noun confusables
   { input: 'can we take the boards off the door',          want: 'OPEN DOOR' },
-  { input: 'turn on the light',                            want: 'LIGHT' },  // LIGHT LANTERN ideal, bare LIGHT tolerated
+  { input: 'turn on the light',                            want: 'LIGHT' },
+
+  // Explicit-verb-respect + collectives (regression from user report)
+  { input: 'ok this is fun. we should grab everything.',   want: 'TAKE' },  // TAKE EVERYTHING or TAKE ALL
+  { input: 'take all the items',                           want: 'TAKE' },
+  { input: 'drop everything',                              want: 'DROP' },
+  { input: 'pick up the lantern',                          want: 'TAKE LANTERN' },
 ];
 
 let failed = 0;
