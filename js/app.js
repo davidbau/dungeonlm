@@ -122,11 +122,11 @@ async function ensureLlmLoaded() {
 
 const buffered = [];
 
-function flushBuffer() {
+async function flushBuffer() {
     // Drop the bare ">" prompt rdline emitted; we draw our own.
     while (buffered.length && buffered[buffered.length - 1] === '>') buffered.pop();
     if (buffered.length) {
-        terminal.print(buffered.join('\n') + '\n');
+        await terminal.printPaged(buffered);
         buffered.length = 0;
     }
 }
@@ -135,7 +135,7 @@ async function translateOnParseFail(original) {
     if (!state.llmEnabled || !state.llmLoaded) return null;
     // Show the parser's "I don't understand X" message before we announce
     // the translation, so the user sees why the fallback fired.
-    flushBuffer();
+    await flushBuffer();
     try {
         terminal.printColored('(translating…)\n', '#888');
         const result = await llm.translate(original);
@@ -204,7 +204,7 @@ async function main() {
     };
 
     const input = async () => {
-        flushBuffer();
+        await flushBuffer();
         return terminal.readLine({ prompt: '> ' });
     };
 
@@ -223,7 +223,7 @@ async function main() {
     } catch (e) {
         if (e.message !== 'cancelled') terminal.println(`dungeon: ${e.message}`);
     }
-    if (buffered.length) terminal.print(buffered.join('\n') + '\n');
+    await flushBuffer();
     terminal.println('[game over]');
 }
 

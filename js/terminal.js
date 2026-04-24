@@ -73,6 +73,49 @@ export class Terminal {
         this._scrollToBottom();
     }
 
+    // Print an array of lines with --More-- pagination. The page size is
+    // computed from the current viewport, with a lower bound so tiny
+    // windows still show something useful. Press any key to continue,
+    // 'q' or Esc to skip the remainder.
+    async printPaged(lines, { pageSize } = {}) {
+        const size = pageSize || this._pageSize();
+        let printed = 0;
+        for (let i = 0; i < lines.length; i++) {
+            this.println(lines[i]);
+            printed++;
+            if (printed >= size && i + 1 < lines.length) {
+                const stop = await this._moreprompt();
+                if (stop) break;
+                printed = 0;
+            }
+        }
+    }
+
+    _pageSize() {
+        // Rough estimate: viewport rows minus 2 for the input line and
+        // the --More-- prompt itself.
+        const viewportH = this.container.clientHeight || window.innerHeight || 600;
+        const fs = parseFloat(getComputedStyle(this.container).fontSize) || 14;
+        const lineH = fs * 1.4;
+        return Math.max(6, Math.floor(viewportH / lineH) - 2);
+    }
+
+    async _moreprompt() {
+        this.container.focus();
+        const line = document.createElement('div');
+        const span = document.createElement('span');
+        span.style.background = this.textColor;
+        span.style.color = this.bgColor;
+        span.textContent = '--More--';
+        line.appendChild(span);
+        this._scroll.appendChild(line);
+        this._scrollToBottom();
+        const e = await this._nextKey();
+        // Clear the prompt visually
+        line.remove();
+        return e.key === 'q' || e.key === 'Q' || e.key === 'Escape';
+    }
+
     async readLine({ prompt = '> ' } = {}) {
         this.container.focus();
         let buf = '';
