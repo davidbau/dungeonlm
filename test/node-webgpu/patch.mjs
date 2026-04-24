@@ -38,6 +38,21 @@ const replacements = [
   // occurrences are inside bundled UMD wrappers where `module` is a local
   // parameter (loglevel's wrapper, for instance) — rewriting there breaks
   // the wrapper. The global `module` is already undefined under ESM.
+
+  // xgrammar state-leak workaround: Web-LLM reuses a cached grammarMatcher
+  // across sequential completions that share the same grammar, calling
+  // this.grammarMatcher.reset() instead of creating a fresh matcher. But
+  // xgrammar's .reset() C++ implementation does not fully clear matcher
+  // state — after ~14 rounds the matcher emits out-of-range token ids and
+  // the wasm runtime crashes. Force the "cache miss" branch by replacing
+  // the reuse test with a literal false; every call now compiles a fresh
+  // matcher. Cost: small re-compile overhead per completion. Benefit:
+  // stable across any number of rounds.
+  // Use a regex to tolerate CRLF vs LF and varying indent widths.
+  [
+    /if \(curResponseFormatKey === this\.responseFormatCacheKey &&\s+this\.grammarMatcher\) \{/,
+    'if (false /* dungeonlm: disable matcher reuse, xgrammar .reset() leaks */ && curResponseFormatKey === this.responseFormatCacheKey && this.grammarMatcher) {',
+  ],
 ];
 
 let out = src, total = 0;
