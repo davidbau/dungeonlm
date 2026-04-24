@@ -181,7 +181,22 @@ async function translateOnParseFail(original, G) {
         const context = exits
             ? `${lastScene}\n(Valid exits from here: ${exits}.)`
             : lastScene;
-        const result = await llm.translate(original, { context });
+        let reloadAnnounced = false;
+        const result = await llm.translate(original, {
+            context,
+            onProgress: (p) => {
+                // Called only when translate() has to reload the engine
+                // after an internal crash. Tell the user so the delay
+                // makes sense.
+                if (!reloadAnnounced) {
+                    terminal.printColored(
+                        '(LLM parser: engine hiccup, reloading…)\n', '#888');
+                    reloadAnnounced = true;
+                }
+                setProgress(p.text || `${Math.round((p.progress || 0) * 100)}%`);
+            },
+        });
+        if (reloadAnnounced) setProgress('');
         if (result && result.command) {
             terminal.printColored(
                 `  ⤷ ${result.command}` +

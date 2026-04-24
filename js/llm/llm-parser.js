@@ -93,7 +93,24 @@ EXAMPLES:
 
 Reply ONLY with the JSON object.`;
 
-export async function translate(raw, { context } = {}) {
+export async function translate(raw, options = {}) {
+    // Try the normal path. If it throws a recognizable engine crash
+    // (xgrammar state corruption — rare but real under sustained use),
+    // discard the crashed engine, reload, and retry once. The model
+    // weights are browser-cached so reload only pays the GPU-load cost
+    // (a few seconds), not a re-download.
+    try {
+        return await doTranslate(raw, options);
+    } catch (e) {
+        if (!isEngineCrash(e)) throw e;
+        console.warn('[llm] engine crash; reloading and retrying:', e.message);
+        enginePromise = null;  // force fresh engine on next loadEngine()
+        await loadEngine(options.onProgress);
+        return await doTranslate(raw, options);
+    }
+}
+
+async function doTranslate(raw, { context } = {}) {
     const [grammar, engine] = await Promise.all([loadGrammar(), loadEngine()]);
     const sceneText = (context || '').trim();
     const userMsg = sceneText
@@ -130,6 +147,14 @@ export async function translate(raw, { context } = {}) {
     } catch {
         return null;
     }
+}
+
+// Recognize the handful of error messages that indicate the engine got
+// into a bad state and needs rebuilding. Other errors (network, parse)
+// should propagate normally.
+function isEngineCrash(err) {
+    const msg = String(err?.message || err);
+    return /grammar matcher rejected|out of range|wasmExports|WebAssembly|RuntimeError/i.test(msg);
 }
 
 // Direction-mismatch override: when the player names a compass direction
