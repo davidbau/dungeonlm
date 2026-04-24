@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dungeonlm — MIT Dungeon with an LLM parser</title>
+<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<link rel="stylesheet" href="./assets/fonts/dejavu-sans-mono.css">
+<style>
+  :root {
+    --bg: #1a1f1a;
+    --panel: #0e120e;
+    --text: #5e5;
+    --muted: #7a9a7a;
+    --accent: #ffc;
+    --border: #2a3a2a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "DejaVu Sans Mono", "Bitstream Vera Sans Mono", monospace;
+    font-size: 14px;
+    line-height: 1.4;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  header {
+    width: 100%;
+    max-width: 800px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+  h1 {
+    color: #afa;
+    font-size: 20px;
+    margin: 0 0 4px 0;
+    font-weight: 700;
+  }
+  .tagline {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  label.toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  label.toggle input { accent-color: #5e5; }
+  #status {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  #llm-progress {
+    color: var(--accent);
+    font-size: 12px;
+  }
+  #terminal {
+    width: 100%;
+    max-width: 800px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  footer {
+    width: 100%;
+    max-width: 800px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+  }
+  footer a { color: var(--text); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  .hint {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>dungeonlm</h1>
+  <div class="tagline">
+    MIT Dungeon (1980 — the original Zork) in your browser, with an
+    optional WebGPU-powered LLM that translates plain English into
+    the game's canonical parser vocabulary.
+  </div>
+  <div class="controls">
+    <label class="toggle">
+      <input type="checkbox" id="llm-toggle">
+      <span>Enable LLM parser fallback</span>
+    </label>
+    <span id="status">LLM parser: off</span>
+    <span id="llm-progress"></span>
+  </div>
+  <div class="hint">
+    Classic commands (<code>take egg</code>, <code>n</code>,
+    <code>read leaflet</code>) always work. When the LLM is on,
+    natural-language phrasing like <em>"please grab the shiny
+    egg"</em> gets translated before the parser sees it. Requires a
+    WebGPU-capable browser; first enable triggers a ~850 MB model
+    download that the browser will cache.
+  </div>
+</header>
+<div id="terminal" tabindex="0"></div>
+<footer>
+  <a href="https://github.com/davidbau/dungeonlm">source</a> &middot;
+  <a href="./docs/LLM_PARSER_DESIGN.md">design doc</a> &middot;
+  MIT Dungeon by Anderson, Blank, Daniels, Lebling (MIT LCS, 1977—1980).
+</footer>
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>

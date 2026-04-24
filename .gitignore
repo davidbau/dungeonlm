@@ -1,0 +1,13 @@
+node_modules/
+
+# Local LLM mirror — large, re-fetchable from upstream
+js/llm/models/
+js/llm/libs/*.wasm
+
+# Editor / OS junk
+.DS_Store
+*.swp
+
+# Test output
+coverage/
+tmp/

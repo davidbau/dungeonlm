@@ -1,0 +1,28 @@
+{
+  "name": "dungeonlm",
+  "version": "0.1.0",
+  "description": "MIT Dungeon (1980 Zork) in the browser, with an optional WebGPU LLM natural-language parser fallback.",
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 8080",
+    "grammar:extract": "node js/llm/extract-vocabulary.mjs",
+    "grammar:generate": "node js/llm/generate-grammar.mjs",
+    "grammar:all": "npm run grammar:extract && npm run grammar:generate"
+  },
+  "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.82"
+  },
+  "keywords": [
+    "dungeon",
+    "zork",
+    "interactive-fiction",
+    "webgpu",
+    "llm",
+    "parser"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/davidbau/dungeonlm"
+  }
+}
