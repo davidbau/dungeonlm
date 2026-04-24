@@ -126,8 +126,57 @@ export async function translate(raw, { context } = {}) {
     try {
         const obj = JSON.parse(text);
         if (typeof obj.command !== 'string') return null;
-        return obj;
+        return applyDirectionOverride(raw, obj);
     } catch {
         return null;
     }
+}
+
+// Direction-mismatch override: when the player names a compass direction
+// and the LLM emits a DIFFERENT compass direction, trust the player.
+// Grammar-constrained decoding at temp 0 still occasionally flips
+// directions (observed "walk west into the forest" -> NORTH even with
+// an explicit prompt example). If the model did not name any direction
+// at all, we leave it alone — the model may have read the input as a
+// non-movement action.
+export function applyDirectionOverride(raw, obj) {
+    const inputDir = findDirection(raw);
+    if (!inputDir) return obj;
+    const outputDir = findDirection(obj.command);
+    if (!outputDir || outputDir === inputDir) return obj;
+    return {
+        ...obj,
+        command: inputDir,
+        explanation:
+            `direction override: LLM output ${outputDir}, ` +
+            `input said ${inputDir}. ` + (obj.explanation || ''),
+    };
+}
+
+// Match the first compass direction in a string. Returns canonical
+// form (one of NORTH/SOUTH/EAST/WEST/NE/NW/SE/SW/UP/DOWN) or null.
+// Order matters: compound directions (NW, NORTHEAST) before their
+// single-word components to avoid "northeast" matching NORTH first.
+function findDirection(s) {
+    const lower = s.toLowerCase();
+    const patterns = [
+        [/\b(?:northwest|nw)\b/,  'NW'],
+        [/\b(?:northeast|ne)\b/,  'NE'],
+        [/\b(?:southwest|sw)\b/,  'SW'],
+        [/\b(?:southeast|se)\b/,  'SE'],
+        [/\b(?:north|northward|northern)\b/, 'NORTH'],
+        [/\b(?:south|southward|southern)\b/, 'SOUTH'],
+        [/\b(?:east|eastward|eastern)\b/,    'EAST'],
+        [/\b(?:west|westward|western)\b/,    'WEST'],
+        [/\b(?:upward|upstairs)\b/,          'UP'],
+        [/\b(?:downward|downstairs)\b/,      'DOWN'],
+        // Bare single-letter / two-letter direction forms. Only at word
+        // boundaries to avoid matching "u" in "under" etc.
+        [/(?:^|[^a-z])up(?:[^a-z]|$)/,       'UP'],
+        [/(?:^|[^a-z])down(?:[^a-z]|$)/,     'DOWN'],
+    ];
+    for (const [pat, canon] of patterns) {
+        if (pat.test(lower)) return canon;
+    }
+    return null;
 }

@@ -8,7 +8,7 @@ import './shims.mjs';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SYSTEM } from '../../js/llm/llm-parser.js';
+import { SYSTEM, applyDirectionOverride } from '../../js/llm/llm-parser.js';
 import { SCENES } from './fixtures/scenes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -129,7 +129,12 @@ async function runOne({ input, want, scene = OPENING_SCENE }) {
     response_format: { type: 'grammar', grammar },
   });
   let cmd = '(parse-err)';
-  try { cmd = JSON.parse(r.choices[0].message.content).command; } catch {}
+  try {
+    const obj = JSON.parse(r.choices[0].message.content);
+    // Apply the same post-processing the production translate() uses.
+    const overridden = applyDirectionOverride(input, obj);
+    cmd = overridden.command;
+  } catch {}
   return cmd;
 }
 
