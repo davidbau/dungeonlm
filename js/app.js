@@ -113,32 +113,32 @@ async function ensureLlmLoaded() {
 }
 
 // ---------------------------------------------------------------------------
-// Input pre-translation
+// Shared output buffer and LLM fallback on parse failure
 // ---------------------------------------------------------------------------
+// We let the classic parser try every input first. Only when it rejects
+// (game.js calls onParseFail) do we invoke the LLM. This avoids second-
+// guessing the parser and means every input the parser already understands
+// stays fast and deterministic.
 
-// Rough heuristic: if the input is short, uppercase, or looks like a
-// canonical command (e.g., "TAKE LANTERN", "n", "look"), don't bother the
-// LLM. Only translate multi-word inputs that contain likely non-vocabulary.
-function looksLikeNaturalLanguage(line) {
-    const s = line.trim();
-    if (s.length === 0) return false;
-    const words = s.split(/\s+/);
-    if (words.length <= 2) return false;
-    // Heuristic: mixed case + articles/filler words suggest English prose.
-    const fillers = /\b(the|a|an|please|i|want|to|try|would|like|could|you|can|some|that|this|my|your)\b/i;
-    return fillers.test(s);
+const buffered = [];
+
+function flushBuffer() {
+    // Drop the bare ">" prompt rdline emitted; we draw our own.
+    while (buffered.length && buffered[buffered.length - 1] === '>') buffered.pop();
+    if (buffered.length) {
+        terminal.print(buffered.join('\n') + '\n');
+        buffered.length = 0;
+    }
 }
 
-async function maybeTranslate(raw) {
-    if (!state.llmEnabled) return raw;
-    if (!looksLikeNaturalLanguage(raw)) return raw;
-    if (!state.llmLoaded) {
-        // Not loaded yet — pass through.
-        return raw;
-    }
+async function translateOnParseFail(original) {
+    if (!state.llmEnabled || !state.llmLoaded) return null;
+    // Show the parser's "I don't understand X" message before we announce
+    // the translation, so the user sees why the fallback fired.
+    flushBuffer();
     try {
         terminal.printColored('(translating…)\n', '#888');
-        const result = await llm.translate(raw);
+        const result = await llm.translate(original);
         if (result && result.command) {
             terminal.printColored(
                 `  ⤷ ${result.command}` +
@@ -150,7 +150,7 @@ async function maybeTranslate(raw) {
     } catch (e) {
         terminal.printColored(`(translate failed: ${e.message})\n`, '#a44');
     }
-    return raw;
+    return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -191,8 +191,8 @@ async function main() {
 
     // The dungeon parser writes lines to `output` (including a bare ">"
     // prompt before calling our `input`). We buffer everything between
-    // input requests and draw our own prompt via terminal.readLine.
-    const buffered = [];
+    // input requests (see module-level `buffered`) and draw our own
+    // prompt via terminal.readLine.
     const output = (text) => {
         for (let line of (text || '').split('\n')) {
             // Fortran-era leading space
@@ -204,15 +204,8 @@ async function main() {
     };
 
     const input = async () => {
-        // Drop the bare ">" prompt rdline emitted; we draw our own.
-        while (buffered.length && buffered[buffered.length - 1] === '>') buffered.pop();
-        if (buffered.length) {
-            terminal.print(buffered.join('\n') + '\n');
-            buffered.length = 0;
-        }
-        const raw = await terminal.readLine({ prompt: '> ' });
-        const translated = await maybeTranslate(raw);
-        return translated;
+        flushBuffer();
+        return terminal.readLine({ prompt: '> ' });
     };
 
     if (state.llmEnabled) {
@@ -223,7 +216,10 @@ async function main() {
     setStatus(state.llmEnabled ? 'LLM parser: loading…' : 'LLM parser: off');
 
     try {
-        await game.run(input, output, { restored });
+        await game.run(input, output, {
+            restored,
+            onParseFail: translateOnParseFail,
+        });
     } catch (e) {
         if (e.message !== 'cancelled') terminal.println(`dungeon: ${e.message}`);
     }

@@ -50,12 +50,39 @@ export async function prepare(onProgress) {
 const SYSTEM = `You are a parser adapter for the 1980 MIT Dungeon game (a Zork clone).
 The player typed English that the strict classic parser could not understand.
 Translate it into a single canonical Dungeon command that the classic parser
-would accept. Canonical commands use UPPERCASE words and only the vocabulary
-defined by the grammar. Examples:
+would accept. Canonical commands are UPPERCASE and use only the grammar's
+vocabulary.
 
-  "grab the brass lantern"   -> {"command": "TAKE BRASS LANTERN", "confidence": 0.95, "explanation": "grab -> TAKE"}
-  "head north quickly"       -> {"command": "NORTH", "confidence": 0.9, "explanation": "head north -> NORTH"}
-  "smash the window open"    -> {"command": "BREAK WINDOW", "confidence": 0.85, "explanation": "smash -> BREAK"}
+CRITICAL RULES:
+1. ALWAYS preserve the specific object the player mentioned. Never collapse
+   "examine the mailbox" into bare "LOOK" — use EXAMINE MAILBOX.
+2. Prefer the MOST SPECIFIC verb that matches the intent:
+   - "inspect", "look at", "look closer", "look closely", "anything special",
+     "what is", "describe" → EXAMINE <object>
+   - "look around", "what do we see", "what else is here" → LOOK
+   - "grab", "pick up", "get" → TAKE <object>
+   - "smash", "break", "destroy" → BREAK <object>
+   - "head north", "go north", "move north" → NORTH
+3. If the player asks a question like "is there X" or "what about Y",
+   treat it as the closest imperative: usually EXAMINE or LOOK.
+4. Drop filler words: articles, politeness, adverbs. Keep the key noun.
+
+Examples:
+
+  "grab the brass lantern"
+    -> {"command": "TAKE BRASS LANTERN", "confidence": 0.95, "explanation": "grab -> TAKE"}
+  "head north quickly"
+    -> {"command": "NORTH", "confidence": 0.9, "explanation": "head north -> NORTH"}
+  "smash the window open"
+    -> {"command": "BREAK WINDOW", "confidence": 0.85, "explanation": "smash -> BREAK"}
+  "look closer at the mailbox"
+    -> {"command": "EXAMINE MAILBOX", "confidence": 0.9, "explanation": "look closer -> EXAMINE, keep object"}
+  "is there anything special about the mailbox"
+    -> {"command": "EXAMINE MAILBOX", "confidence": 0.85, "explanation": "inspect question -> EXAMINE"}
+  "what else do we see"
+    -> {"command": "LOOK", "confidence": 0.8, "explanation": "general survey -> LOOK"}
+  "please put the leaflet inside the mailbox"
+    -> {"command": "PUT LEAFLET IN MAILBOX", "confidence": 0.9, "explanation": "verb + object + prep + object"}
 
 If the intent is unclear, pick the most likely reading and lower confidence.
 Reply ONLY with the JSON object. No prose.`;
@@ -71,7 +98,7 @@ export async function translate(raw, { context } = {}) {
             { role: 'system', content: SYSTEM },
             { role: 'user', content: userMsg },
         ],
-        temperature: 0.2,
+        temperature: 0,
         max_tokens: 200,
         response_format: { type: 'grammar', grammar },
     });

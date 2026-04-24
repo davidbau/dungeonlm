@@ -410,6 +410,19 @@ export class DungeonGame {
       G.prswon = parse(G, G.inbuf, G.inlnt, true);
       if (G._trace) console.error(`GAME: move=${G.moves} here=${G.here} prsa=${G.prsa} prso=${G.prso} prsi=${G.prsi} prswon=${G.prswon}`);
 
+      // Hook: on parse failure, give the caller a chance to substitute
+      // a replacement command (used by dungeonlm's LLM parser fallback).
+      // options.onParseFail(original) returns a replacement string or null.
+      if (!G.prswon && typeof options.onParseFail === 'function') {
+        const replacement = await options.onParseFail(G.inbuf);
+        if (replacement && typeof replacement === 'string') {
+          G.inbuf = replacement.toUpperCase();
+          G.inlnt = G.inbuf.length;
+          G.prscon = 1;
+          G.prswon = parse(G, G.inbuf, G.inlnt, true);
+        }
+      }
+
       if (!G.prswon) {
         // Parse failed
         xendmv(G);
