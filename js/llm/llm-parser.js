@@ -288,6 +288,18 @@ export async function translate(raw, { context } = {}) {
         ? `Scene:\n${sceneText}\n\nPlayer input: ${raw}`
         : `(No scene context.)\n\nPlayer input: ${raw}`;
 
+    // Reset the chat session before every translation. We never use
+    // conversation history here (each translate call is stateless), and
+    // without this, xgrammar's matcher state accumulates across calls
+    // and eventually emits an out-of-range token id, crashing the
+    // WebGPU runtime (observed after ~14 calls). Cost: the system
+    // prompt has to be re-prefilled each call — ~2s on a warm engine.
+    // That overhead is acceptable because LLM fallback only fires on
+    // parser rejection, not every turn.
+    if (typeof engine.resetChat === 'function') {
+        await engine.resetChat();
+    }
+
     const response = await engine.chat.completions.create({
         messages: [
             { role: 'system', content: SYSTEM },
