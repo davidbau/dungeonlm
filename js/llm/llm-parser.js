@@ -156,6 +156,12 @@ vocabulary.
    - "go up" → UP
    - "I want to travel northeast" → NE
 
+   If the Scene includes a line like "(Valid exits from here: NORTH,
+   SOUTH, WEST.)" use it to disambiguate a vague movement phrase. But
+   when the player has clearly named a direction, that direction wins
+   even if it's not among the listed exits (the game will tell them
+   there's no exit there).
+
 4. VERB DISAMBIGUATION:
    - "inspect", "look at X", "look closer at X", "look closely at X",
      "anything special about X", "what is X", "describe X" → EXAMINE X

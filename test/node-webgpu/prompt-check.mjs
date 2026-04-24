@@ -22,36 +22,63 @@ const engine = await webllm.CreateMLCEngine(MODEL, {
 });
 process.stdout.write('\n');
 
+// The typical opening-scene context that the live app passes to the LLM.
+const OPENING_SCENE = `Welcome to Dungeon (with an LLM parser).\t\t\tThis version created 2-Dec-81.
+This is an open field west of a white house with a boarded front door.
+There is a small mailbox here.
+A rubber mat saying "Welcome to Dungeon!" lies by the door.`;
+
 const cases = [
-  // The two the user reported
-  { input: 'tell me about dungeon?',                   want: 'HELP' },
-  { input: 'look closer at the mailbox',               want: 'EXAMINE MAILBOX' },
+  // Meta-intent distinction (HELP for HOW-TO, INFO for WHAT-IS)
+  { input: 'tell me about dungeon?',                       want: 'INFO' },
+  { input: 'what is this game about',                      want: 'INFO' },
+  { input: 'how do I play',                                want: 'HELP' },
+  { input: 'what can I do here',                           want: 'HELP' },
+  { input: 'what am I carrying',                           want: 'INVENTORY' },
+  { input: 'where am I',                                   want: 'LOOK' },
+  { input: 'I quit',                                       want: 'QUIT' },
+
+  // Object-preservation
+  { input: 'look closer at the mailbox',                   want: 'EXAMINE MAILBOX' },
   { input: 'is there anything special about the mailbox', want: 'EXAMINE MAILBOX' },
-  { input: 'what else do we see',                      want: 'LOOK' },
-  // Sanity checks for the other intents
-  { input: 'how do I play',                            want: 'HELP' },
-  { input: 'what can I do here',                       want: 'INFO or HELP' },
-  { input: 'what am I carrying',                       want: 'INVENTORY' },
-  { input: 'where am I',                               want: 'LOOK' },
-  { input: 'I quit',                                   want: 'QUIT' },
-  { input: 'grab the shiny egg',                       want: 'TAKE EGG' },
-  { input: 'head north quickly',                       want: 'NORTH' },
-  { input: 'smash the window open',                    want: 'BREAK WINDOW' },
+  { input: 'what else do we see',                          want: 'LOOK' },
+  { input: 'grab the shiny egg',                           want: 'TAKE EGG' },
+  { input: 'smash the window open',                        want: 'BREAK WINDOW' },
+
+  // Directions — the literal-direction rule under test
+  { input: 'head north quickly',                           want: 'NORTH' },
+  { input: 'walk to the south of the house',               want: 'SOUTH' },
+  { input: 'walk to the west of the house',                want: 'WEST' },
+  { input: 'walk west into the forest',                    want: 'WEST' },
+  { input: 'head to the eastern part of the forest',       want: 'EAST' },
+  { input: 'let us proceed northward',                     want: 'NORTH' },
+  { input: 'travel southwest',                             want: 'SW' },
+  { input: 'I want to go up',                              want: 'UP' },
+  { input: 'lets climb down into the cave',                want: 'DOWN' },
+
+  // Verb-vs-noun confusables
+  { input: 'can we take the boards off the door',          want: 'OPEN DOOR' },
+  { input: 'turn on the light',                            want: 'LIGHT' },  // LIGHT LANTERN ideal, bare LIGHT tolerated
 ];
 
+let failed = 0;
 for (const { input, want } of cases) {
   const r = await engine.chat.completions.create({
     messages: [
       { role: 'system', content: SYSTEM },
-      { role: 'user', content: `Player input: ${input}` },
+      { role: 'user', content: `Scene:\n${OPENING_SCENE}\n\nPlayer input: ${input}` },
     ],
     max_tokens: 200, temperature: 0,
     response_format: { type: 'grammar', grammar },
   });
   let cmd = '(parse-err)';
   try { cmd = JSON.parse(r.choices[0].message.content).command; } catch {}
-  const ok = cmd.toUpperCase().includes(want.split(' or ')[0])
-    || (want.includes(' or ') && want.split(' or ').some(w => cmd.toUpperCase().includes(w)));
-  console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${JSON.stringify(input).padEnd(55)} → ${cmd.padEnd(30)} (want: ${want})`);
+  // Accept if every space-separated token of `want` appears in the output.
+  const wants = want.toUpperCase().split(' ');
+  const out = cmd.toUpperCase();
+  const ok = wants.every(w => out.includes(w));
+  if (!ok) failed++;
+  console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${JSON.stringify(input).padEnd(55)} → ${cmd.padEnd(35)} (want: ${want})`);
 }
-process.exit(0);
+console.log(`\n${cases.length - failed}/${cases.length} passed`);
+process.exit(failed === 0 ? 0 : 1);

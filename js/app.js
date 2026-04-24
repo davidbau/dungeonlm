@@ -11,6 +11,28 @@
 
 import { Terminal } from './terminal.js';
 import * as llm from './llm/llm-parser.js';
+import { findxt } from '../game/support.js';
+
+// Direction constant -> canonical word. Values are from
+// game/constants.js (XNORTH, XNE, ... XCROSS). We can't import them
+// because constants.js uses different names; pin the values inline.
+const EXIT_DIRECTIONS = [
+    [1024,  'NORTH'], [2048, 'NE'],   [3072, 'EAST'],  [4096, 'SE'],
+    [5120,  'SOUTH'], [6144, 'SW'],   [7168, 'WEST'],  [8192, 'NW'],
+    [9216,  'UP'],    [10240,'DOWN'], [11264,'LAUNCH'],[12288,'LAND'],
+    [13312, 'IN'],    [14336,'OUT'],  [15360,'CROSS'],
+];
+
+function describeExits(G) {
+    if (!G || G.here == null) return '';
+    const found = [];
+    for (const [val, name] of EXIT_DIRECTIONS) {
+        try {
+            if (findxt(G, val, G.here).found) found.push(name);
+        } catch { /* missing state — skip */ }
+    }
+    return found.join(', ');
+}
 
 const DATA_URL = './game/dungeon-data.json';
 const TEXT_URL = './game/dungeon-text.json';
@@ -148,14 +170,18 @@ async function flushBuffer() {
     }
 }
 
-async function translateOnParseFail(original) {
+async function translateOnParseFail(original, G) {
     if (!state.llmEnabled || !state.llmLoaded) return null;
     // Show the parser's "I don't understand X" message before we announce
     // the translation, so the user sees why the fallback fired.
     await flushBuffer();
     try {
         terminal.printColored('(translating…)\n', '#888');
-        const result = await llm.translate(original, { context: lastScene });
+        const exits = describeExits(G);
+        const context = exits
+            ? `${lastScene}\n(Valid exits from here: ${exits}.)`
+            : lastScene;
+        const result = await llm.translate(original, { context });
         if (result && result.command) {
             terminal.printColored(
                 `  ⤷ ${result.command}` +

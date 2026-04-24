@@ -412,9 +412,11 @@ export class DungeonGame {
 
       // Hook: on parse failure, give the caller a chance to substitute
       // a replacement command (used by dungeonlm's LLM parser fallback).
-      // options.onParseFail(original) returns a replacement string or null.
+      // onParseFail(original, G) -> replacement string | null.
+      // Passing G lets the caller inspect game state (current room,
+      // valid exits, visible objects) to inform the translation.
       if (!G.prswon && typeof options.onParseFail === 'function') {
-        const replacement = await options.onParseFail(G.inbuf);
+        const replacement = await options.onParseFail(G.inbuf, G);
         if (replacement && typeof replacement === 'string') {
           G.inbuf = replacement.toUpperCase();
           G.inlnt = G.inbuf.length;
