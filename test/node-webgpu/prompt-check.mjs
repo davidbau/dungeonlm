@@ -63,12 +63,20 @@ const cases = [
 
 let failed = 0;
 for (const { input, want } of cases) {
+  // Reset conversation state between cases. Without this, xgrammar's
+  // matcher state and Web-LLM's KV cache accumulate cruft across
+  // sequential completions and eventually produce out-of-range token
+  // IDs that crash the engine (observed after ~14 completions in a
+  // fresh process).
+  if (typeof engine.resetChat === 'function') {
+    await engine.resetChat();
+  }
   const r = await engine.chat.completions.create({
     messages: [
       { role: 'system', content: SYSTEM },
       { role: 'user', content: `Scene:\n${OPENING_SCENE}\n\nPlayer input: ${input}` },
     ],
-    max_tokens: 200, temperature: 0,
+    max_tokens: 80, temperature: 0,
     response_format: { type: 'grammar', grammar },
   });
   let cmd = '(parse-err)';
