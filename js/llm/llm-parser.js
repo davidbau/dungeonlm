@@ -142,7 +142,21 @@ vocabulary.
    - Only use HELP or INFO when the player is clearly asking about the
      GAME ITSELF, not about something in the room.
 
-3. VERB DISAMBIGUATION:
+3. DIRECTIONS ARE LITERAL. When the player names a compass direction
+   (NORTH / SOUTH / EAST / WEST / NE / NW / SE / SW / UP / DOWN / IN /
+   OUT), preserve it EXACTLY. Never flip to the opposite. Never re-reason
+   about where the player "should" be going. The direction the player
+   named is the direction they want to go.
+
+   - "walk south" → SOUTH
+   - "walk to the south of the house" → SOUTH (the player said "south"
+     — do not translate this to NORTH just because they mentioned the
+     house)
+   - "head to the eastern part of the forest" → EAST
+   - "go up" → UP
+   - "I want to travel northeast" → NE
+
+4. VERB DISAMBIGUATION:
    - "inspect", "look at X", "look closer at X", "look closely at X",
      "anything special about X", "what is X", "describe X" → EXAMINE X
    - "look around", "look", "what do we see", "what else is here",
@@ -163,10 +177,10 @@ vocabulary.
    - "give up", "I quit", "end the game" → QUIT
    - "save", "save my game" → SAVE
 
-4. DROP FILLER. Remove articles, politeness ("please"), adverbs
+5. DROP FILLER. Remove articles, politeness ("please"), adverbs
    ("quickly"), vague pronouns. Keep only the verb + object phrase.
 
-5. USE THE SCENE CONTEXT. If the user message begins with a "Scene:"
+6. USE THE SCENE CONTEXT. If the user message begins with a "Scene:"
    block, that is the recent game output — the room description, the
    objects present, and the player's recent inventory. Use it to:
    - Resolve pronouns: "take it" → TAKE <the object the scene most
@@ -176,7 +190,7 @@ vocabulary.
    - Pick the right specific object when the user is vague: "look at
      the thing" → EXAMINE <the most salient object in the scene>
 
-6. NEVER INVENT AN OBJECT THAT ISN'T IN THE SCENE. If the user's words
+7. NEVER INVENT AN OBJECT THAT ISN'T IN THE SCENE. If the user's words
    don't clearly point at any object mentioned in the Scene: context,
    output bare LOOK instead of inventing a random vocabulary noun.
    Do NOT output "EXAMINE SQUARE TILES" for "look closer at the
@@ -206,6 +220,12 @@ vocabulary.
     -> {"command": "TAKE BRASS LANTERN", "confidence": 0.95, "explanation": "grab -> TAKE"}
   "head north quickly"
     -> {"command": "NORTH", "confidence": 0.9, "explanation": "head north -> NORTH"}
+  "walk to the south of the house"
+    -> {"command": "SOUTH", "confidence": 0.9, "explanation": "direction is literal — player said south"}
+  "head to the eastern part of the forest"
+    -> {"command": "EAST", "confidence": 0.85, "explanation": "direction is literal — player said east"}
+  "go up the tree"
+    -> {"command": "UP", "confidence": 0.9, "explanation": "direction + object context, bare direction wins"}
   "smash the window open"
     -> {"command": "BREAK WINDOW", "confidence": 0.85, "explanation": "smash -> BREAK"}
   "look closer at the mailbox"
