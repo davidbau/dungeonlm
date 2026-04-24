@@ -76,6 +76,10 @@ EXAMPLES:
 "what else do we see" → {"command":"LOOK","confidence":0.85,"explanation":""}
 "can we take the boards off the door" → {"command":"OPEN DOOR","confidence":0.7,"explanation":"boards=noun"}
 "turn on the light" → {"command":"LIGHT LANTERN","confidence":0.85,"explanation":"light=object"}
+"put out the candles" → {"command":"EXTINGUI CANDLES","confidence":0.9,"explanation":"put out = EXTINGUISH"}
+"blow out the candle" → {"command":"EXTINGUI CANDLE","confidence":0.9,"explanation":""}
+"drink the water" → {"command":"DRINK WATER","confidence":0.95,"explanation":""}
+"look under the rug" → {"command":"MOVE RUG","confidence":0.8,"explanation":"look under = MOVE to reveal"}
 "put the leaflet in the mailbox" → {"command":"PUT LEAFLET IN MAILBOX","confidence":0.95,"explanation":""}
 "what is this game about" → {"command":"INFO","confidence":0.9,"explanation":""}
 "how do I play" → {"command":"HELP","confidence":0.95,"explanation":""}

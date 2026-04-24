@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SYSTEM } from '../../js/llm/llm-parser.js';
+import { SCENES } from './fixtures/scenes.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MODEL = process.env.WEBLLM_MODEL || 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
@@ -22,11 +23,10 @@ const engine = await webllm.CreateMLCEngine(MODEL, {
 });
 process.stdout.write('\n');
 
-// The typical opening-scene context that the live app passes to the LLM.
-const OPENING_SCENE = `Welcome to Dungeon (with an LLM parser).\t\t\tThis version created 2-Dec-81.
-This is an open field west of a white house with a boarded front door.
-There is a small mailbox here.
-A rubber mat saying "Welcome to Dungeon!" lies by the door.`;
+// Default scene used when a case doesn't specify one. Most opening-area
+// prompt tests work against this. For scenario-specific cases (combat,
+// containers, endgame) we attach an explicit scene from SCENES.
+const OPENING_SCENE = SCENES.opening;
 
 const cases = [
   // Meta-intent distinction (HELP for HOW-TO, INFO for WHAT-IS)
@@ -73,34 +73,87 @@ const cases = [
   { input: 'take all the items',                           want: 'TAKE' },
   { input: 'drop everything',                              want: 'DROP' },
   { input: 'pick up the lantern',                          want: 'TAKE LANTERN' },
+
+  // ---- Combat (troll room) ----
+  { scene: SCENES.trollRoom, input: 'fight the troll',               want: 'ATTACK TROLL' },
+  // Accept either ATTACK or KILL — both are valid game verbs with
+  // equivalent semantics; the test checks for TROLL in the output.
+  { scene: SCENES.trollRoom, input: 'kill the troll with the sword', want: 'TROLL' },
+  { scene: SCENES.trollRoom, input: 'attack him',                    want: 'ATTACK TROLL' },
+  { scene: SCENES.trollRoom, input: 'take the axe',                  want: 'TAKE AXE' },
+
+  // ---- Combat (cyclops) ----
+  { scene: SCENES.cyclopsRoom, input: 'fight the cyclops',           want: 'ATTACK CYCLOPS' },
+  { scene: SCENES.cyclopsRoom, input: 'go up the stairs',            want: 'UP' },
+
+  // ---- Containers (kitchen) ----
+  // Parser accepts either SACK or BAG — grammar has both.
+  { scene: SCENES.kitchen, input: 'grab the sack',                   want: 'TAKE' },
+  { scene: SCENES.kitchen, input: 'open the brown sack',             want: 'OPEN SACK' },
+  { scene: SCENES.kitchen, input: 'drink the water',                 want: 'DRINK WATER' },
+  { scene: SCENES.kitchen, input: 'climb up the staircase',          want: 'UP' },
+  { scene: SCENES.kitchen, input: 'go out the window',               want: 'OUT' },
+
+  // ---- Inventory + trophy case (living room) ----
+  { scene: SCENES.livingRoom, input: 'take the lantern',             want: 'TAKE LANTERN' },
+  { scene: SCENES.livingRoom, input: 'grab the sword off the wall',  want: 'TAKE SWORD' },
+  { scene: SCENES.livingRoom, input: 'read the newspaper',           want: 'READ' },  // READ any paper-like noun
+  { scene: SCENES.livingRoom, input: 'look under the rug',           want: 'RUG' },   // MOVE/EXAMINE/LOOK-UNDER RUG — any is acceptable; grammar-valid output should mention RUG
+
+  // ---- Egyptian tomb (coffin) ----
+  { scene: SCENES.egyptianTomb, input: 'take the gold coffin',       want: 'TAKE' },  // TAKE COFFIN or TAKE GOLD COFFIN
+  { scene: SCENES.egyptianTomb, input: 'go south',                   want: 'SOUTH' },
+
+  // ---- Dark / grue ----
+  { scene: SCENES.darkGrue, input: 'light my lantern',               want: 'LIGHT' },
+  { scene: SCENES.darkGrue, input: 'turn on the lamp',               want: 'LIGHT' },
+
+  // ---- Temple altar ----
+  { scene: SCENES.templeAltar, input: 'read the black book',         want: 'READ' },  // READ BOOK
+  { scene: SCENES.templeAltar, input: 'put out the candles',         want: 'EXTINGUI' },  // EXTINGUI CANDLES (truncated in grammar)
 ];
 
-let failed = 0;
-for (const { input, want } of cases) {
-  // resetChat() clears any lingering Web-LLM/xgrammar state between
-  // cases. patch.mjs disables matcher reuse, but there appears to be
-  // another state leak (observed crashes at ~case 13 even with the
-  // patch). resetChat adds ~2s KV-reprefill per call and makes the
-  // suite fully stable.
-  if (typeof engine.resetChat === 'function') {
-    await engine.resetChat();
+let currentEngine = engine;
+let failed = 0, errored = 0;
+
+async function runOne({ input, want, scene = OPENING_SCENE }) {
+  if (typeof currentEngine.resetChat === 'function') {
+    await currentEngine.resetChat();
   }
-  const r = await engine.chat.completions.create({
+  const r = await currentEngine.chat.completions.create({
     messages: [
       { role: 'system', content: SYSTEM },
-      { role: 'user', content: `Scene:\n${OPENING_SCENE}\n\nPlayer input: ${input}` },
+      { role: 'user', content: `Scene:\n${scene}\n\nPlayer input: ${input}` },
     ],
     max_tokens: 80, temperature: 0,
     response_format: { type: 'grammar', grammar },
   });
   let cmd = '(parse-err)';
   try { cmd = JSON.parse(r.choices[0].message.content).command; } catch {}
-  // Accept if every space-separated token of `want` appears in the output.
-  const wants = want.toUpperCase().split(' ');
-  const out = cmd.toUpperCase();
-  const ok = wants.every(w => out.includes(w));
-  if (!ok) failed++;
-  console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${JSON.stringify(input).padEnd(55)} → ${cmd.padEnd(35)} (want: ${want})`);
+  return cmd;
 }
-console.log(`\n${cases.length - failed}/${cases.length} passed`);
-process.exit(failed === 0 ? 0 : 1);
+
+for (const c of cases) {
+  const { input, want } = c;
+  let cmd, ok = false, tag = 'ok  ';
+  try {
+    cmd = await runOne(c);
+    const wants = want.toUpperCase().split(' ');
+    ok = wants.every(w => cmd.toUpperCase().includes(w));
+    if (!ok) { failed++; tag = 'FAIL'; }
+  } catch (e) {
+    // xgrammar state corruption bug: rare per-call crash. Recreate the
+    // engine and continue; mark this case as errored (not failed).
+    errored++; tag = 'ERR ';
+    cmd = `(crash: ${e.message.slice(0, 40)})`;
+    console.log(`  ${tag}  ${JSON.stringify(input).padEnd(55)} → ${cmd}`);
+    console.log('  (recreating engine...)');
+    currentEngine = await webllm.CreateMLCEngine(MODEL, { initProgressCallback: () => {} });
+    continue;
+  }
+  console.log(`  ${tag}  ${JSON.stringify(input).padEnd(55)} → ${cmd.padEnd(35)} (want: ${want})`);
+}
+
+const passed = cases.length - failed - errored;
+console.log(`\n${passed}/${cases.length} passed, ${failed} failed, ${errored} errored (engine crashes)`);
+process.exit((failed + errored) === 0 ? 0 : 1);
